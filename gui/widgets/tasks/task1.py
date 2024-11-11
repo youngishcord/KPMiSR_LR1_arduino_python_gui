@@ -18,6 +18,7 @@ class LedController(QWidget):
         self.lay.addLayout(self.create_color("Красный", "red"))
         self.lay.addLayout(self.create_color("Зеленый", "green"))
         self.lay.addLayout(self.create_color("Синий", "blue"))
+        # self.lay.addLayout(self.create_color("черный", "black"))
         
     
     def create_color(self, name: str, color: str) -> QtWidgets.QVBoxLayout:
@@ -30,12 +31,12 @@ class LedController(QWidget):
         
         pb = QtWidgets.QPushButton("Переключатель")
         pb.setCheckable(True)
-        pb.clicked.connect(lambda: self.swich_led(pb.isChecked(), name))
+        pb.clicked.connect(lambda: self.swich_led(pb.isChecked(), name, color))
         lay.addWidget(pb)
-        
         return lay
         
         
-    def swich_led(self, state, name):
-        self.log_message.emit(f"Изменено состояние светодиода {name}")
+    def swich_led(self, state, name, color):
+        self.log_message.emit(f"Изменено состояние светодиода {name} {state}")
+        self.write_command.emit(f"SetLed {color} {state}")
         

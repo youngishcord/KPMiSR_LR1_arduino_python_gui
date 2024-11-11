@@ -13,7 +13,15 @@ class Controller(QWidget):
         self.connection_state = False
         self.serial = QSerialPort()
         self.serial.errorOccurred.connect(self.handle_error)
+    
+    @Slot(str)
+    def write_command(self, command):
+        # if not self.serial.isOpen():
+        #     self.log_message.emit("Нет подключения к микроконтроллеру")
+        #     return
         
+        print("Отправлена команда ", command)
+    
         
     @Slot(str, int)
     def open_port(self, port_name:str, port_speed:int):

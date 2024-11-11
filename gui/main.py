@@ -49,6 +49,9 @@ class MainWindow(QMainWindow):
         self.settings.on_disconnect.connect(self.controller.close_port)
         
         self.controller.update_state.connect(self.settings.update_state)
+        
+        self.tasks.log_message.connect(self.cli.log_message)
+        self.tasks.write_command.connect(self.controller.write_command)
 
 
 if __name__ == "__main__":
