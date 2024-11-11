@@ -6,7 +6,8 @@ from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from PySide6.QtCore import Signal, Slot
 
 from widgets.tasks.task1 import LedController
-from widgets.tasks.task2 import ServController
+from widgets.tasks.task2 import ServoController
+from widgets.tasks.task3 import StepController
 
 
 class TasksTabs(QtWidgets.QTabWidget):
@@ -17,11 +18,13 @@ class TasksTabs(QtWidgets.QTabWidget):
         super().__init__(parent)
         
         self.led_controller = LedController()
-        self._setup_widget(self.led_controller, "Контроллет светодиодов")
+        self._setup_widget(self.led_controller, "Контроллер светодиодов")
         
-        self.serv_controller = ServController()
-        self._setup_widget(self.serv_controller, "Контроллет сервопривода")
-
+        self.serv_controller = ServoController()
+        self._setup_widget(self.serv_controller, "Контроллер сервопривода")
+        
+        self.step_controller = StepController()
+        self._setup_widget(self.step_controller, "Контроллер шаговика")
         
     def _setup_widget(self, widget_, name):
         self.addTab(widget_, name)
