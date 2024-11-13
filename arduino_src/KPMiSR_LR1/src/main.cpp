@@ -65,6 +65,8 @@ void loop() {
       } else if (color == "blue") {
         digitalWrite(BLUE_PIN, state);
       }
+    } else if (command == "Test") {
+      Serial.println("Test 2\0");
     } else if (command == "ServoSet") {
       int angle = input.substring(spaceIndex+1, input.length()).toInt();
       myServo.write(angle);

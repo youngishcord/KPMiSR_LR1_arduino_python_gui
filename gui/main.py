@@ -47,6 +47,7 @@ class MainWindow(QMainWindow):
         self.settings.log_message.connect(self.cli.log_message)
         self.settings.on_connect.connect(self.controller.open_port)
         self.settings.on_disconnect.connect(self.controller.close_port)
+        self.settings.write_command.connect(self.controller.write_command)
         
         self.controller.update_state.connect(self.settings.update_state)
         

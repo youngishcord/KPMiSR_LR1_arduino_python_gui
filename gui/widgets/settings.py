@@ -6,10 +6,13 @@ from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from PySide6.QtCore import QIODevice, Signal, Slot
 
 
+TEST = 1
+
 class Settings(QWidget):
     log_message = Signal(str)
     on_connect = Signal(str, int)
     on_disconnect = Signal()
+    write_command = Signal(str)
     
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -43,9 +46,17 @@ class Settings(QWidget):
         self.state_widget = QtWidgets.QLabel()
         self.lay.addWidget(self.state_widget, 4, 0, 1, 2)
         self.state_widget.setStyleSheet("background-color: red;")
+
+        if TEST:
+            self.test_bt = QtWidgets.QPushButton("TEST")
+            self.lay.addWidget(self.test_bt)
+            self.test_bt.clicked.connect(self._on_test)
         
         self.update_settings()
         
+    def _on_test(self):
+        self.write_command.emit("Test 1\0")
+
     @Slot()
     def _on_connect(self):
         self.on_connect.emit(self.ports.currentText(), int(self.speed.currentText()))
