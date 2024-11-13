@@ -5,7 +5,7 @@ from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
 from PySide6.QtCore import QIODevice, Signal, Slot, Qt
 
 
-class StepController(QWidget):
+class DPTController(QWidget):
     log_message = Signal(str)
     write_command = Signal(str)
     
@@ -18,22 +18,22 @@ class StepController(QWidget):
         self.lay.addWidget(QtWidgets.QLabel("Управление шаговым двигателем"))
         
         self.min_widget = QtWidgets.QSpinBox()
-        self.min_widget.setMinimum(-10000)
+        self.min_widget.setMinimum(-255)
         self.min_widget.setMaximum(-1)
-        self.min_widget.setValue(-10)
+        self.min_widget.setValue(-255)
         self.min_widget.valueChanged.connect(self.change_min)
         
         self.slider = QSlider(Qt.Orientation.Horizontal)
-        self.slider.setMinimum(-10000)
-        self.slider.setMaximum(10000)
+        self.slider.setMinimum(-255)
+        self.slider.setMaximum(255)
         self.slider.setValue(0)
         self.slider.valueChanged.connect(self.change_current)
         # self.slider.sliderReleased.connect(self._write_command)
         
         self.max_widget = QtWidgets.QSpinBox()
         self.max_widget.setMinimum(1)
-        self.max_widget.setMaximum(10000)
-        self.max_widget.setValue(10)
+        self.max_widget.setMaximum(255)
+        self.max_widget.setValue(255)
         self.max_widget.valueChanged.connect(self.change_max)
         
         layout = QtWidgets.QHBoxLayout()
@@ -72,5 +72,5 @@ class StepController(QWidget):
 
     def _write_command(self):
         self.log_message.emit(f"Шаговый выставлен на {self.current_angle.value()}")
-        self.write_command.emit(f"StepperSet {self.current_angle.value()}")
+        self.write_command.emit(f"DPTSet {self.current_angle.value()}")
         self.current_angle.setValue(0)

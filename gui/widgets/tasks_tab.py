@@ -8,6 +8,7 @@ from PySide6.QtCore import Signal, Slot
 from widgets.tasks.task1 import LedController
 from widgets.tasks.task2 import ServoController
 from widgets.tasks.task3 import StepController
+from widgets.tasks.task4 import DPTController
 
 
 class TasksTabs(QtWidgets.QTabWidget):
@@ -24,6 +25,9 @@ class TasksTabs(QtWidgets.QTabWidget):
         self._setup_widget(self.serv_controller, "Контроллер сервопривода")
         
         self.step_controller = StepController()
+        self._setup_widget(self.step_controller, "Контроллер шаговика")
+
+        self.step_controller = DPTController()
         self._setup_widget(self.step_controller, "Контроллер шаговика")
         
     def _setup_widget(self, widget_, name):

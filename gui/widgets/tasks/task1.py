@@ -2,7 +2,7 @@ import PySide6
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QWidget, QPlainTextEdit
 from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
-from PySide6.QtCore import QIODevice, Signal, Slot
+from PySide6.QtCore import QIODevice, Signal, Slot, QByteArray
 
 
 class LedController(QWidget):
@@ -37,6 +37,6 @@ class LedController(QWidget):
         
         
     def swich_led(self, state, name, color):
-        self.log_message.emit(f"Изменено состояние светодиода {name} {state}")
-        self.write_command.emit(f"SetLed {color} {state}")
+        self.log_message.emit(f"Изменено состояние светодиода {name} {1 if state else 0}")
+        self.write_command.emit(f"SetLed {color} {1 if state else 0}")
         

@@ -1,7 +1,7 @@
 
 from PySide6.QtWidgets import QWidget, QPlainTextEdit
 from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
-from PySide6.QtCore import Signal, Slot, QIODevice
+from PySide6.QtCore import Signal, Slot, QIODevice, QByteArray
 
 
 class Controller(QWidget):
@@ -13,15 +13,21 @@ class Controller(QWidget):
         self.connection_state = False
         self.serial = QSerialPort()
         self.serial.errorOccurred.connect(self.handle_error)
+
+        self.serial.readyRead.connect(self.handle_read)
+    
     
     @Slot(str)
-    def write_command(self, command):
+    def write_command(self, command:str):
         # if not self.serial.isOpen():
         #     self.log_message.emit("Нет подключения к микроконтроллеру")
         #     return
-        
+        self.serial.write(QByteArray(command.encode('utf-8')))
         print("Отправлена команда ", command)
     
+    def handle_read(self):
+        data = self.serial.readAll()
+        print(">Получено:", data.data().decode('utf-8'))
         
     @Slot(str, int)
     def open_port(self, port_name:str, port_speed:int):
