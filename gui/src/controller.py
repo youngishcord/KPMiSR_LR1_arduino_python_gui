@@ -22,6 +22,7 @@ class Controller(QWidget):
         # if not self.serial.isOpen():
         #     self.log_message.emit("Нет подключения к микроконтроллеру")
         #     return
+        command += "\0"
         self.serial.write(QByteArray(command.encode('utf-8')))
         print("Отправлена команда ", command)
     
