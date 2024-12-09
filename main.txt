@@ -1,0 +1,491 @@
+
+from PySide6.QtWidgets import QWidget, QPlainTextEdit
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtCore import Signal, Slot, QIODevice, QByteArray
+
+
+class Controller(QWidget):
+    log_message = Signal(str)
+    update_state = Signal(bool)
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        self.connection_state = False
+        self.serial = QSerialPort()
+        self.serial.errorOccurred.connect(self.handle_error)
+
+        self.serial.readyRead.connect(self.handle_read)
+    
+    
+    @Slot(str)
+    def write_command(self, command:str):
+        # if not self.serial.isOpen():
+        #     self.log_message.emit("Нет подключения к микроконтроллеру")
+        #     return
+        self.serial.write(QByteArray(command.encode('utf-8')))
+        print("Отправлена команда ", command)
+    
+    def handle_read(self):
+        data = self.serial.readAll()
+        print(">Получено:", data.data().decode('utf-8'))
+        
+    @Slot(str, int)
+    def open_port(self, port_name:str, port_speed:int):
+        if self.serial.isOpen():
+            self.log_message.emit("Подключение уже установлено")
+            return
+        self.serial.setPortName(port_name)
+        self.serial.setBaudRate(port_speed)
+        self.serial.open(QIODevice.OpenModeFlag.ReadWrite)
+        self.log_message.emit(f"Подключение к порту {port_name}, скорость {port_speed}")
+        if not self.serial.isOpen():
+            self.log_message.emit("Подключение не было установлено")
+            return
+        self.connection_state = True
+        self.update_state.emit(self.connection_state)
+        
+        
+    @Slot()
+    def close_port(self):
+        if not self.serial.isOpen():
+            self.log_message.emit("Подключение отсутствует")
+            return
+        self.log_message.emit("Отключение")
+        self.serial.close()
+        self.connection_state = False
+        self.update_state.emit(self.connection_state)
+        
+        
+    @Slot(QSerialPort.SerialPortError)
+    def handle_error(self, error):
+        if error == QSerialPort.ResourceError:
+            # Плохо работает
+            self.log_message.emit("Потеряно соединение")
+            if self.serial.isOpen():
+                self.serial.close()
+                self.connection_state = False
+                self.update_state.emit(self.connection_state)
+        elif error == QSerialPort.PermissionError:
+            self.log_message.emit("Потеряно соединение")
+            if self.serial.isOpen():
+                self.serial.close()
+                self.connection_state = False
+                self.update_state.emit(self.connection_state)
+        elif error == QSerialPort.NoError:
+            return
+        else:
+            # self.log_message.emit(error)
+            print("В КОНТРОЛЛЕРЕ ВЫЗВАНО НЕОБРАБОТАННОЕ ИСКЛЮЧЕНИЕ")
+            print(error)
+
+
+import PySide6
+from PySide6 import QtWidgets
+from PySide6.QtWidgets import QWidget, QPlainTextEdit
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtCore import QIODevice, Signal, Slot, QByteArray
+
+
+class LedController(QWidget):
+    log_message = Signal(str)
+    write_command = Signal(str)
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        
+        self.lay = QtWidgets.QHBoxLayout()
+        self.setLayout(self.lay)
+        
+        self.lay.addLayout(self.create_color("Красный", "red"))
+        self.lay.addLayout(self.create_color("Зеленый", "green"))
+        self.lay.addLayout(self.create_color("Синий", "blue"))
+        # self.lay.addLayout(self.create_color("черный", "black"))
+        
+    
+    def create_color(self, name: str, color: str) -> QtWidgets.QVBoxLayout:
+        lay = QtWidgets.QVBoxLayout()
+        lay.addWidget(QtWidgets.QLabel(name))
+        
+        color_widget = QtWidgets.QLabel()
+        color_widget.setStyleSheet(f"background-color: {color};")
+        lay.addWidget(color_widget)
+        
+        pb = QtWidgets.QPushButton("Переключатель")
+        pb.setCheckable(True)
+        pb.clicked.connect(lambda: self.swich_led(pb.isChecked(), name, color))
+        lay.addWidget(pb)
+        return lay
+        
+        
+    def swich_led(self, state, name, color):
+        self.log_message.emit(f"Изменено состояние светодиода {name} {1 if state else 0}")
+        self.write_command.emit(f"SetLed {color} {1 if state else 0}")
+        
+
+import PySide6
+from PySide6 import QtWidgets
+from PySide6.QtWidgets import QWidget, QPlainTextEdit, QSlider
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtCore import QIODevice, Signal, Slot, Qt
+
+
+class ServoController(QWidget):
+    log_message = Signal(str)
+    write_command = Signal(str)
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        
+        self.lay = QtWidgets.QVBoxLayout()
+        self.setLayout(self.lay)
+        
+        self.lay.addWidget(QtWidgets.QLabel("Управление сервоприводом"))
+        
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setMinimum(0)
+        self.slider.setMaximum(180)
+        self.slider.valueChanged.connect(self.change_current)
+        self.slider.sliderReleased.connect(self._write_command)
+        
+        self.max_widget = QtWidgets.QSpinBox()
+        self.max_widget.setMinimum(0)
+        self.max_widget.setMaximum(2048)
+        self.max_widget.setValue(180)
+        self.max_widget.valueChanged.connect(self.change_max)
+        
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(self.slider)
+        layout.addWidget(self.max_widget)
+        self.lay.addLayout(layout)
+        
+        self.current_angle = QtWidgets.QSpinBox()
+        self.current_angle.setMinimum(0)
+        self.current_angle.setMaximum(self.max_widget.value())
+        self.current_angle.valueChanged.connect(self.change_current)
+        
+        self.lay.addWidget(self.current_angle)
+
+
+    @Slot(int)
+    def change_max(self, val):
+        self.current_angle.setMaximum(val)
+        self.slider.setMaximum(val)
+        
+
+    @Slot(int)
+    def change_current(self, val):
+        self.current_angle.setValue(val)
+        self.slider.setValue(val)
+        
+        
+    def _write_command(self):
+        self.log_message.emit(f"Сервопривод выставлен на {self.current_angle.value()}")
+        self.write_command.emit(f"ServoSet {self.current_angle.value()}")
+
+
+import PySide6
+from PySide6 import QtWidgets
+from PySide6.QtWidgets import QWidget, QPlainTextEdit, QSlider
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtCore import QIODevice, Signal, Slot, Qt
+
+
+class StepController(QWidget):
+    log_message = Signal(str)
+    write_command = Signal(str)
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        
+        self.lay = QtWidgets.QVBoxLayout()
+        self.setLayout(self.lay)
+        
+        self.lay.addWidget(QtWidgets.QLabel("Управление шаговым двигателем"))
+        
+        self.min_widget = QtWidgets.QSpinBox()
+        self.min_widget.setMinimum(-10000)
+        self.min_widget.setMaximum(-1)
+        self.min_widget.setValue(-10)
+        self.min_widget.valueChanged.connect(self.change_min)
+        
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setMinimum(-10000)
+        self.slider.setMaximum(10000)
+        self.slider.setValue(0)
+        self.slider.valueChanged.connect(self.change_current)
+        # self.slider.sliderReleased.connect(self._write_command)
+        
+        self.max_widget = QtWidgets.QSpinBox()
+        self.max_widget.setMinimum(1)
+        self.max_widget.setMaximum(10000)
+        self.max_widget.setValue(10)
+        self.max_widget.valueChanged.connect(self.change_max)
+        
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(self.min_widget)
+        layout.addWidget(self.slider)
+        layout.addWidget(self.max_widget)
+        self.lay.addLayout(layout)
+        
+        self.current_angle = QtWidgets.QSpinBox()
+        self.current_angle.setMinimum(self.min_widget.value())
+        self.current_angle.setMaximum(self.max_widget.value())
+        self.current_angle.valueChanged.connect(self.change_current)
+        
+        self.lay.addWidget(self.current_angle)
+        
+        self.start_step = QtWidgets.QPushButton("Начать движение")
+        self.start_step.clicked.connect(self._write_command)
+        self.lay.addWidget(self.start_step)
+        
+
+    @Slot(int)
+    def change_min(self, val):
+        self.current_angle.setMinimum(val)
+        self.slider.setMinimum(val)
+
+    @Slot(int)
+    def change_max(self, val):
+        self.current_angle.setMaximum(val)
+        self.slider.setMaximum(val)
+
+    @Slot(int)
+    def change_current(self, val):
+        self.current_angle.setValue(val)
+        self.slider.setValue(val)
+
+
+    def _write_command(self):
+        self.log_message.emit(f"Шаговый выставлен на {self.current_angle.value()}")
+        self.write_command.emit(f"StepperSet {self.current_angle.value()}")
+        self.current_angle.setValue(0)
+
+
+import PySide6
+from PySide6 import QtWidgets
+from PySide6.QtWidgets import QWidget, QPlainTextEdit, QSlider
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtCore import QIODevice, Signal, Slot, Qt
+
+
+class DPTController(QWidget):
+    log_message = Signal(str)
+    write_command = Signal(str)
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        
+        self.lay = QtWidgets.QVBoxLayout()
+        self.setLayout(self.lay)
+        
+        self.lay.addWidget(QtWidgets.QLabel("Управление шаговым двигателем"))
+        
+        self.min_widget = QtWidgets.QSpinBox()
+        self.min_widget.setMinimum(-255)
+        self.min_widget.setMaximum(-1)
+        self.min_widget.setValue(-255)
+        self.min_widget.valueChanged.connect(self.change_min)
+        
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setMinimum(-255)
+        self.slider.setMaximum(255)
+        self.slider.setValue(0)
+        self.slider.valueChanged.connect(self.change_current)
+        # self.slider.sliderReleased.connect(self._write_command)
+        
+        self.max_widget = QtWidgets.QSpinBox()
+        self.max_widget.setMinimum(1)
+        self.max_widget.setMaximum(255)
+        self.max_widget.setValue(255)
+        self.max_widget.valueChanged.connect(self.change_max)
+        
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(self.min_widget)
+        layout.addWidget(self.slider)
+        layout.addWidget(self.max_widget)
+        self.lay.addLayout(layout)
+        
+        self.current_angle = QtWidgets.QSpinBox()
+        self.current_angle.setMinimum(self.min_widget.value())
+        self.current_angle.setMaximum(self.max_widget.value())
+        self.current_angle.valueChanged.connect(self.change_current)
+        
+        self.lay.addWidget(self.current_angle)
+        
+        self.start_step = QtWidgets.QPushButton("Начать движение")
+        self.start_step.clicked.connect(self._write_command)
+        self.lay.addWidget(self.start_step)
+        
+
+    @Slot(int)
+    def change_min(self, val):
+        self.current_angle.setMinimum(val)
+        self.slider.setMinimum(val)
+
+    @Slot(int)
+    def change_max(self, val):
+        self.current_angle.setMaximum(val)
+        self.slider.setMaximum(val)
+
+    @Slot(int)
+    def change_current(self, val):
+        self.current_angle.setValue(val)
+        self.slider.setValue(val)
+
+
+    def _write_command(self):
+        self.log_message.emit(f"Шаговый выставлен на {self.current_angle.value()}")
+        self.write_command.emit(f"DPTSet {self.current_angle.value()}")
+        self.current_angle.setValue(0)
+
+
+
+import PySide6
+from PySide6 import QtWidgets
+from PySide6.QtWidgets import QWidget, QPlainTextEdit
+from PySide6.QtCore import Signal, Slot
+
+
+class Cli(QPlainTextEdit):
+    # insertText() дополнение текста
+    # setText() Замена текста
+    def __init__(self, parent = None):
+        super().__init__(parent)
+
+        self.setReadOnly(True)
+        self.setPlainText("Начало работы")
+
+
+    @Slot(str)
+    def log_message(self, message):
+        self.appendPlainText("> " + message)
+        
+    
+    @Slot()
+    def clear_console(self):
+        self.clear()
+
+
+
+import PySide6
+from PySide6 import QtWidgets
+from PySide6.QtWidgets import QWidget, QPlainTextEdit
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtCore import QIODevice, Signal, Slot
+
+
+TEST = 1
+
+class Settings(QWidget):
+    log_message = Signal(str)
+    on_connect = Signal(str, int)
+    on_disconnect = Signal()
+    write_command = Signal(str)
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        
+        self.lay = QtWidgets.QGridLayout()
+        self.setLayout(self.lay)
+        
+        self.lay.addWidget(QtWidgets.QLabel("Панель подключения"), 0, 0)
+        self.lay.addWidget(QtWidgets.QLabel("Порт подключения:"), 1, 0)
+        
+        self.ports = QtWidgets.QComboBox()
+        self.lay.addWidget(self.ports, 2, 0)
+        
+        self.lay.addWidget(QtWidgets.QLabel("Скорость подключения:"), 1, 1)
+        
+        self.speed = QtWidgets.QComboBox()
+        self.lay.addWidget(self.speed, 2, 1)
+        
+        self.update_bt = QtWidgets.QPushButton("Обновить")
+        self.lay.addWidget(self.update_bt, 0, 1)
+        self.update_bt.clicked.connect(self.update_settings)
+        
+        self.connect_bt = QtWidgets.QPushButton("Подключиться")
+        self.lay.addWidget(self.connect_bt)
+        self.connect_bt.clicked.connect(self._on_connect)
+        
+        self.disconnect_bt = QtWidgets.QPushButton("Отключиться")
+        self.lay.addWidget(self.disconnect_bt)
+        self.disconnect_bt.clicked.connect(self._on_disconnect)
+        
+        self.state_widget = QtWidgets.QLabel()
+        self.lay.addWidget(self.state_widget, 4, 0, 1, 2)
+        self.state_widget.setStyleSheet("background-color: red;")
+
+        if TEST:
+            self.test_bt = QtWidgets.QPushButton("TEST")
+            self.lay.addWidget(self.test_bt)
+            self.test_bt.clicked.connect(self._on_test)
+        
+        self.update_settings()
+        
+    def _on_test(self):
+        self.write_command.emit("Test 1\0")
+
+    @Slot()
+    def _on_connect(self):
+        self.on_connect.emit(self.ports.currentText(), int(self.speed.currentText()))
+        
+    def _on_disconnect(self):
+        self.on_disconnect.emit()
+
+    def update_settings(self):
+        self.ports.clear()
+        self.speed.clear()
+        
+        self.log_message.emit("Обновление данных")
+        self.ports.addItems([port.portName() for port in QSerialPortInfo.availablePorts()])
+        
+        self.speed.addItems(map(str, QSerialPortInfo.standardBaudRates()))
+        
+    @Slot(bool)
+    def update_state(self, state):
+        self.state_widget.setStyleSheet(f"background-color: {'green' if state else 'red'};")
+
+
+
+import PySide6
+from PySide6 import QtWidgets
+from PySide6.QtWidgets import QWidget, QPlainTextEdit
+from PySide6.QtSerialPort import QSerialPort, QSerialPortInfo
+from PySide6.QtCore import Signal, Slot
+
+from widgets.tasks.task1 import LedController
+from widgets.tasks.task2 import ServoController
+from widgets.tasks.task3 import StepController
+from widgets.tasks.task4 import DPTController
+
+
+class TasksTabs(QtWidgets.QTabWidget):
+    log_message = Signal(str)
+    write_command = Signal(str)
+    
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        
+        self.led_controller = LedController()
+        self._setup_widget(self.led_controller, "Контроллер светодиодов")
+        
+        self.serv_controller = ServoController()
+        self._setup_widget(self.serv_controller, "Контроллер сервопривода")
+        
+        self.step_controller = StepController()
+        self._setup_widget(self.step_controller, "Контроллер шаговика")
+
+        self.step_controller = DPTController()
+        self._setup_widget(self.step_controller, "Контроллер шаговика")
+        
+    def _setup_widget(self, widget_, name):
+        self.addTab(widget_, name)
+        widget_.log_message.connect(self._log_emmiter)
+        widget_.write_command.connect(self._write_emmiter)
+
+
+    def _log_emmiter(self, data: str):
+        self.log_message.emit(data)
+        
+    def _write_emmiter(self, data: str):
+        self.write_command.emit(data)
