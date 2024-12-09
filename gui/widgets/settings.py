@@ -55,7 +55,7 @@ class Settings(QWidget):
         self.update_settings()
         
     def _on_test(self):
-        self.write_command.emit("Test 1\0")
+        self.write_command.emit("Test 1")
 
     @Slot()
     def _on_connect(self):

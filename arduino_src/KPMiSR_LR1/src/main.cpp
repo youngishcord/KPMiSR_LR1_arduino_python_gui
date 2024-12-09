@@ -41,11 +41,14 @@ void setup() {
   myServo.attach(servoPin);
   myStepper.setSpeed(30);
   Serial.begin(9600);
+
+  Serial.println("Starting arduino");
 }
 
 void loop() {
   if (Serial.available()) {
-    String input = Serial.readString();
+    String input = Serial.readStringUntil('\0');
+    Serial.println("recived message: " + input);
     int spaceIndex = input.indexOf(' ');
     String command = input.substring(0, spaceIndex);
     if (command == "SetLed") {
